@@ -1,0 +1,129 @@
+---
+title: "Prediction Assignment Writeup"
+author: "Sherif Hassan"
+date: "January 12, 2018"
+output:
+  html_document: default
+  word_document: default
+---
+This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+
+When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
+
+# Data
+
+The training data for this project are available here:
+https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv
+
+The test data are available here:
+https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv
+
+
+
+# What you should submit
+
+The goal of your project is to predict the manner in which they did the exercise. This is the "classe" variable in the training set. You may use any of the other variables to predict with. You should create a report describing how you built your model, how you used cross validation, what you think the expected out of sample error is, and why you made the choices you did. You will also use your prediction model to predict 20 different test cases.
+
+# Reproducibility
+
+Due to security concerns with the exchange of R code, your code will not be run during the evaluation by your classmates. Please be sure that if they download the repo, they will be able to view the compiled HTML version of your analysis.
+
+# Background
+
+Using devices such as Jawbone Up, Nike FuelBand, and Fitbit it is now possible to collect a large amount of data about personal activity relatively inexpensively. These type of devices are part of the quantified self movement - a group of enthusiasts who take measurements about themselves regularly to improve their health, to find patterns in their behavior, or because they are tech geeks. One thing that people regularly do is quantify how much of a particular activity they do, but they rarely quantify how well they do it. In this project, your goal will be to use data from accelerometers on the belt, forearm, arm, and dumbell of 6 participants. 
+
+#loading required Libraries
+```{r}
+library(dplyr)
+library(ggplot2)
+library(caret)
+library(RColorBrewer)
+library(randomForest)
+library(rpart) 
+library(reshape2)
+library(plyr)
+library(lattice)
+library(rpart.plot)
+```
+#Loading (Training and Testing)Data Sets
+```{r}
+trainingdataSet <- read.csv("pml-training.csv", na.strings=c("NA","#DIV/0!", ""))
+
+testingdataSet <- read.csv('pml-testing.csv', na.strings=c("NA","#DIV/0!", ""))
+#din data
+head(trainingdataSet)
+head(testingdataSet)
+dim(trainingdataSet)
+dim(testingdataSet)
+```
+
+#Cleaning Data 
+```{r}
+Tr_data <- trainingdataSet[, 1:159]; Te_data <- testingdataSet[, 1:159]
+final <- rbind(Tr_data ,Te_data)
+
+# Delete Null Values
+list_na <- sapply(final, function(x) sum(is.na(x)))
+final <- final[, list_na == 0]
+
+# Change Time Stamp
+final$hour_of_day <- strftime(as.POSIXct(final$raw_timestamp_part_1, origin = "1970-01-01", tz = "GMT"),format = "%H")
+final$hour_of_day <- as.numeric(final$hour_of_day)
+
+final <- final[, -c(1, 3:5, 7)]
+```
+#Devide training set into two data set to perform cross-validation
+```{r}
+s1 <- createDataPartition(y=trainingdataSet$classe, p=0.76, list=FALSE)
+Training <- trainingdataSet[s1, ] 
+Testing <- trainingdataSet[-s1, ]
+dim(Training)
+dim(Testing)
+head(Training)
+head(Testing)
+```
+#1st Predection Type (Random Forest) 
+
+```{r}
+set.seed(123)
+
+train <- cbind(final [1:dim(trainingdataSet)[1], ], trainingdataSet[, 160])
+names(train)[dim(train)[2]] <- 'classe'
+inTrain <- createDataPartition(y = train$classe, p = 0.7, list = F)
+training <- train[inTrain, ]; testing <- train[-inTrain,]
+
+RF_model = randomForest(classe ~ ., data = training, ntree=500)
+DT_model = rpart(classe ~ ., data = training)
+
+
+pred <- predict(RF_model, testing)
+DE<- data.frame(y = testing$classe, pred = pred)
+DE$equal <- 0
+for (i in 1:dim(DE)[1]){
+        if (DE$y[i] == DE$pred[i]){
+                DE$equal[i] <- 1
+        } else { DE$equal[i] <- 0 }}
+sum(DE$equal)/length(DE$equal)
+#accuracy with  100%
+es <- final[(1+dim(train)[1]):dim(final)[1], ]
+predict(RF_model, es)
+```
+
+
+
+
+# 2nd Predection type (Decision Tree)
+```{r}
+model <- rpart(classe ~ ., data=Training)
+prediction_2 <- predict(model , Testing)
+# Ploting the Decision Tree
+rpart.plot(model, main="Tree", extra=102,  faclen=10)
+```
+
+#Conclusion
+#Best prediction is random forest type
+because of it's more accuracy than decision tree
+
+Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
+
+Thanks
